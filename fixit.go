@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -30,6 +31,8 @@ func main() {
 }
 
 func handlePerson(person string) {
+	fmt.Println(person)
+
 	movies, err := readDirNames(filepath.Join(inputDir, person))
 	if err != nil {
 		panic(err)
@@ -67,11 +70,13 @@ func handleMovie(person, movie string, personAttributesFile *os.File, id *int) {
 	for _, movieFile := range movieFiles {
 		if strings.HasSuffix(movieFile, ".txt") {
 			movieAttributesFile = &movieFile
+			break
 		}
 	}
 
 	if movieAttributesFile == nil {
 		fmt.Printf("> Ignoring %s/%s because it has no attributes file\n", person, movie)
+		return
 	}
 
 	images, err := readDirNames(filepath.Join(inputDir, person, movie, "images"))
@@ -79,7 +84,24 @@ func handleMovie(person, movie string, personAttributesFile *os.File, id *int) {
 		panic(err)
 	}
 
+	afileConts, err := ioutil.ReadFile(filepath.Join(inputDir, person, movie, *movieAttributesFile))
+	if err != nil {
+		fmt.Println(*movieAttributesFile)
+		panic(err)
+	}
+
+	afileLines := strings.Split(string(afileConts), "\n")
+
 	for _, image := range images {
+		for _, line := range afileLines {
+			if idx := strings.Index(line, image); idx >= 0 {
+				fixedLine := strings.Join(strings.Fields(line)[2:], "\t")
+				fixedLine = strings.Replace(fixedLine, image, strconv.Itoa(*id)+".jpg", 1) + "\n"
+
+				personAttributesFile.Write([]byte(fixedLine))
+			}
+		}
+
 		err = copyFile(filepath.Join(inputDir, person, movie, "images", image), filepath.Join(outputDir, person, strconv.Itoa(*id)+".jpg"))
 		(*id)++
 	}
